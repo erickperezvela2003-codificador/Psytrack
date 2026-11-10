@@ -1,0 +1,12 @@
+# Dependencias
+node_modules/
+
+# Credenciales y configuración local
+.env
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>PSYTrack - Agenda</title>
+    <link rel="stylesheet" href="estilos.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        .agenda-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .fecha-control { display: flex; align-items: center; gap: 15px; font-size: 18px; font-weight: bold; color: #2c3e50; }
+        .cita-card { background: white; border-left: 5px solid #4a90e2; padding: 15px; margin-bottom: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+        .cita-hora { font-weight: bold; font-size: 18px; color: #4a90e2; margin-right: 20px; }
+        .cita-info h4 { margin: 0; color: #333; }
+        .cita-info p { margin: 0; color: #777; font-size: 14px; }
+        .estado-cancelada { border-left-color: #e74c3c; opacity: 0.6; }
+        .estado-finalizada { border-left-color: #27ae60; background-color: #f9fff9; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; width: 400px; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-logo" onclick="window.location.href='dashboard.html'" style="cursor:pointer">🧠 PSYTrack</div>
+        <div class="nav-user">
+            <span id="nombreUser">Dr.</span>
+            <button onclick="window.location.href='index.html'" class="btn-logout">Salir</button>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="agenda-header">
+            <div class="fecha-control">
+                <button class="btn-primary" style="width: auto; padding: 5px 10px;" onclick="cambiarDia(-1)">&#9664;</button>
+                <input type="date" id="filtroFecha" style="padding: 5px; font-size: 16px; border: 1px solid #ddd; border-radius: 5px;">
+                <button class="btn-primary" style="width: auto; padding: 5px 10px;" onclick="cambiarDia(1)">&#9654;</button>
+            </div>
+            <button class="btn-primary" style="width: auto;" onclick="abrirModalCita()">+ Nueva Cita</button>
+        </div>
+
+        <h3 id="tituloDia">Citas del día:</h3>
+        <div id="listaCitas"><p style="text-align: center; color: #999;">Cargando...</p></div>
+    </div>
+
+    <div id="modalCita" class="modal">
+        <div class="modal-content">
+            <h3>Registrar Cita</h3>
+            <form id="formCita">
+                <div class="input-group"><label>Paciente</label><select id="selectPaciente" style="width:100%; padding:10px;" required><option value="">Seleccione...</option></select></div>
+                <div class="input-group"><label>Fecha</label><input type="date" id="fechaCita" required></div>
+                <div class="input-group"><label>Hora</label><input type="time" id="horaCita" required></div>
+                <div class="input-group"><label>Motivo</label><input type="text" id="motivoCita"></div>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button type="button" class="btn-primary" style="background:#ccc; color:black;" onclick="cerrarModal('modalCita')">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar Cita</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalAsistencia" class="modal">
+        <div class="modal-content">
+            <h3>Validar Asistencia</h3>
+            <form id="formAsistencia">
+                <input type="hidden" id="asist_id_cita">
+                <div class="input-group">
+                    <label>Estado:</label>
+                    <select id="asist_estado" style="width:100%; padding:10px;">
+                        <option value="Asistió">✅ Asistió</option>
+                        <option value="No asistió">❌ No Asistió</option>
+                        <option value="Retraso">⏰ Retraso</option>
+                    </select>
+                </div>
+                <div class="input-group"><label>Nota (Opcional):</label><input type="text" id="asist_nota"></div>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button type="button" class="btn-primary" style="background:#ccc; color:black;" onclick="cerrarModal('modalAsistencia')">Cancelar</button>
+                    <button type="submit" class="btn-primary" style="background:#27ae60;">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const idPsicologo = localStorage.getItem('id_psicologo');
+        document.getElementById('nombreUser').innerText = localStorage.getItem('nombre_psicologo');
+        const inputFecha = document.getElementById('filtroFecha');
+        inputFecha.value = new Date().toISOString().split('T')[0];
+
+        cargarPacientesSelect();
+        cargarAgenda();
+
+        inputFecha.addEventListener('change', cargarAgenda);
+
+        function cambiarDia(dias) {
+            const fechaActual = new Date(inputFecha.value);
+            fechaActual.setDate(fechaActual.getDate() + dias);
+            inputFecha.value = fechaActual.toISOString().split('T')[0];
+            cargarAgenda();
+        }
+
+        async function cargarAgenda() {
+            const container = document.getElementById('listaCitas');
+            container.innerHTML = '<p style="text-align: center; color: #999;">Consultando...</p>';
+            try {
+                const res = await fetch(`http://localhost:3001/api/citas?id_psicologo=${idPsicologo}&fecha=${inputFecha.value}`);
+                const citas = await res.json();
+                container.innerHTML = '';
+
+                if (citas.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; padding: 20px; color: #999;">No hay citas.</p>';
+                } else {
+                    citas.forEach(cita => {
+                        const hora = new Date(cita.FechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        let claseExtra = '', botones = '';
+
+                        if (cita.Estado === 'Cancelada') {
+                            claseExtra = 'estado-cancelada';
+                            botones = '<span style="color:red; font-size:12px;">Cancelada</span>';
+                        } else if (cita.Estado === 'Finalizada' || cita.Estado === 'No Asistió') {
+                            claseExtra = 'estado-finalizada';
+                            botones = `<span style="color:green; font-size:12px;">${cita.Estado}</span>`;
+                        } else {
+                            botones = `
+                                <button class="btn-primary btn-small" style="background:#27ae60; margin-right:5px;" onclick="abrirModalAsistencia(${cita.ID_Cita})">✅ Asistencia</button>
+                                <button class="btn-primary btn-small" style="background:#e74c3c;" onclick="cancelarCita(${cita.ID_Cita})">❌</button>
+                            `;
+                        }
+
+                        container.innerHTML += `
+                            <div class="cita-card ${claseExtra}">
+                                <div style="display:flex; align-items:center;">
+                                    <div class="cita-hora">${hora}</div>
+                                    <div class="cita-info"><h4>${cita.Nombres} ${cita.Apellidos}</h4><p>${cita.Motivo || 'Sin motivo'}</p></div>
+                                </div>
+                                <div>${botones}</div>
+                            </div>`;
+                    });
+                }
+            } catch (error) { container.innerHTML = '<p style="color: red;">Error al cargar</p>'; }
+        }
+
+        function abrirModalAsistencia(id) {
+            document.getElementById('asist_id_cita').value = id;
+            document.getElementById('modalAsistencia').style.display = 'flex';
+        }
+
+        document.getElementById('formAsistencia').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                id_cita: document.getElementById('asist_id_cita').value,
+                estado: document.getElementById('asist_estado').value,
+                nota: document.getElementById('asist_nota').value
+            };
+            await fetch('http://localhost:3001/api/asistencia', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            alert('✅ Asistencia registrada');
+            cerrarModal('modalAsistencia');
+            cargarAgenda();
+        });
+
+        async function cargarPacientesSelect() {
+            const res = await fetch(`http://localhost:3001/api/pacientes?id_psicologo=${idPsicologo}`);
+            const pacientes = await res.json();
+            const select = document.getElementById('selectPaciente');
+            pacientes.forEach(p => {
+                select.innerHTML += `<option value="${p.ID_Paciente}">${p.Nombres} ${p.Apellidos}</option>`;
+            });
+        }
+
+        document.getElementById('formCita').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const idPaciente = document.getElementById('selectPaciente').value;
+            const fechaSel = document.getElementById('fechaCita').value;
+            const hora = document.getElementById('horaCita').value;
+            const motivo = document.getElementById('motivoCita').value;
+
+            const res = await fetch('http://localhost:3001/api/citas', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id_psicologo: idPsicologo, id_paciente: idPaciente, fechaHora: `${fechaSel}T${hora}`, motivo: motivo })
+            });
+            const result = await res.json();
+            if(result.success) {
+                alert('✅ Cita registrada');
+                cerrarModal('modalCita');
+                if(fechaSel === inputFecha.value) cargarAgenda();
+            } else { alert(result.message); }
+        });
+
+        async function cancelarCita(id) {
+            if(!confirm("¿Cancelar cita?")) return;
+            await fetch('http://localhost:3001/api/citas/cancelar', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id_cita: id }) });
+            cargarAgenda();
+        }
+
+        function abrirModalCita() { 
+            document.getElementById('modalCita').style.display = 'flex'; 
+            document.getElementById('fechaCita').value = document.getElementById('filtroFecha').value;
+        }
+        function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+    </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>PSYTrack - Módulo Clínico</title>
+    <link rel="stylesheet" href="estilos.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        /* Estilo específico para tarjetas de pacientes clínicos */
+        .grid-pacientes {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .card-paciente {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            border-left: 5px solid #f39c12; /* Color naranja para distinguir Clínico */
+            transition: transform 0.2s;
+        }
+        .card-paciente:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .icon-folder { font-size: 24px; }
+        .btn-ver-notas {
+            width: 100%;
+            margin-top: 15px;
+            background-color: #f39c12;
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-ver-notas:hover { background-color: #d35400; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-logo" onclick="window.location.href='dashboard.html'" style="cursor:pointer">🧠 PSYTrack</div>
+        <div class="nav-user">
+            <span id="nombreUser">Dr.</span>
+            <button onclick="window.location.href='index.html'" class="btn-logout">Salir</button>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <h2>Módulo Clínico</h2>
+        <p style="color: #666;">Seleccione un paciente para gestionar sus Notas de Evolución y Documentos.</p>
+
+        <div id="listaClinica" class="grid-pacientes">
+            <p style="color:#999;">Cargando expedientes...</p>
+        </div>
+    </div>
+
+    <script>
+        // 1. Verificar sesión
+        const idPsicologo = localStorage.getItem('id_psicologo');
+        if (!idPsicologo) window.location.href = 'index.html';
+        
+        document.getElementById('nombreUser').innerText = 'Dr. ' + localStorage.getItem('nombre_psicologo');
+
+        // 2. Cargar pacientes
+        cargarPacientesClinicos();
+
+        async function cargarPacientesClinicos() {
+            try {
+                // Reutilizamos la API de pacientes que ya creamos, ¡reciclaje de código!
+                const res = await fetch(`http://localhost:3001/api/pacientes?id_psicologo=${idPsicologo}`);
+                const pacientes = await res.json();
+                
+                const container = document.getElementById('listaClinica');
+                container.innerHTML = '';
+
+                if (pacientes.length === 0) {
+                    container.innerHTML = '<p>No hay pacientes activos. Ve al módulo de Pacientes para registrar uno.</p>';
+                } else {
+                    pacientes.forEach(p => {
+                        // Creamos una tarjeta bonita por cada paciente
+                        const card = `
+                            <div class="card-paciente">
+                                <div class="card-header">
+                                    <h3>${p.Nombres} ${p.Apellidos}</h3>
+                                    <span class="icon-folder">📂</span>
+                                </div>
+                                <p style="font-size: 14px; color: #777;">Tel: ${p.Telefono}</p>
+                                <button class="btn-ver-notas" onclick="irAExpediente(${p.ID_Paciente})">
+                                    Gestionar Notas y Docs
+                                </button>
+                            </div>
+                        `;
+                        container.innerHTML += card;
+                    });
+                }
+            } catch (error) {
+                console.error(error);
+                document.getElementById('listaClinica').innerHTML = '<p style="color:red;">Error al cargar la lista.</p>';
+            }
+        }
+
+        function irAExpediente(id) {
+            // Guardamos el ID y mandamos directo al historial (que es donde están las notas)
+            localStorage.setItem('id_paciente_actual', id);
+            window.location.href = 'historial.html';
+        }
+    </script>
+</body>
+</html>

@@ -52,8 +52,8 @@ PSYTrack_Sistema/
 1. Clona el repositorio e instala las dependencias:
 
    ```bash
-   git clone https://github.com/TU_USUARIO/PSYTrack.git
-   cd PSYTrack
+   git clone https://github.com/erickperezvela2003-codificador/Psytrack.git
+   cd Psytrack
    npm install
    ```
 
